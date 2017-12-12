@@ -5,7 +5,6 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 
 import com.facebook.react.ReactApplication;
@@ -24,39 +23,52 @@ public class MessagingService extends FirebaseMessagingService {
     @Override
     public void onMessageReceived(RemoteMessage remoteMessage) {
         Log.d(TAG, "Remote message received");
-        Intent i = new Intent("com.evollu.react.fcm.ReceiveNotification");
-        i.putExtra("data", remoteMessage);
-        handleBadge(remoteMessage);
-        buildLocalNotification(remoteMessage);
+        System.out.println("remoteMessage.getData(): " +remoteMessage.getData());
 
-        final Intent message = i;
-        
-        // We need to run this on the main thread, as the React code assumes that is true.
-        // Namely, DevServerHelper constructs a Handler() without a Looper, which triggers:
-        // "Can't create handler inside thread that has not called Looper.prepare()"
-        Handler handler = new Handler(Looper.getMainLooper());
-        handler.post(new Runnable() {
-            public void run() {
-                // Construct and load our normal React JS code bundle
-                ReactInstanceManager mReactInstanceManager = ((ReactApplication) getApplication()).getReactNativeHost().getReactInstanceManager();
-                ReactContext context = mReactInstanceManager.getCurrentReactContext();
-                // If it's constructed, send a notification
-                if (context != null) {
-                    LocalBroadcastManager.getInstance(getApplicationContext()).sendBroadcast(message);
-                } else {
-                    // Otherwise wait for construction, then send the notification
-                    mReactInstanceManager.addReactInstanceEventListener(new ReactInstanceManager.ReactInstanceEventListener() {
-                        public void onReactContextInitialized(ReactContext context) {
-                            LocalBroadcastManager.getInstance(getApplicationContext()).sendBroadcast(message);
+        //TODO: If normal notification, present banner. Else, call screen
+
+        if(remoteMessage.getData().get("custom_notification") != null) {
+            Intent i = new Intent("com.evollu.react.fcm.ReceiveNotification");
+            i.putExtra("data", remoteMessage);
+            handleBadge(remoteMessage);
+            buildLocalNotification(remoteMessage);
+
+            final Intent message = i;
+
+            // We need to run this on the main thread, as the React code assumes that is true.
+            // Namely, DevServerHelper constructs a Handler() without a Looper, which triggers:
+            // "Can't create handler inside thread that has not called Looper.prepare()"
+            Handler handler = new Handler(Looper.getMainLooper());
+            handler.post(new Runnable() {
+                public void run() {
+                    // Construct and load our normal React JS code bundle
+                    ReactInstanceManager mReactInstanceManager = ((ReactApplication) getApplication()).getReactNativeHost().getReactInstanceManager();
+                    ReactContext context = mReactInstanceManager.getCurrentReactContext();
+                    // If it's constructed, send a notification
+                    if (context != null) {
+                        context.sendOrderedBroadcast(message, null);
+                    } else {
+                        // Otherwise wait for construction, then send the notification
+                        mReactInstanceManager.addReactInstanceEventListener(new ReactInstanceManager.ReactInstanceEventListener() {
+                            public void onReactContextInitialized(ReactContext context) {
+                                context.sendOrderedBroadcast(message, null);
+                            }
+                        });
+                        if (!mReactInstanceManager.hasStartedCreatingInitialContext()) {
+                            // Construct it in the background
+                            mReactInstanceManager.createReactContextInBackground();
                         }
-                    });
-                    if (!mReactInstanceManager.hasStartedCreatingInitialContext()) {
-                        // Construct it in the background
-                        mReactInstanceManager.createReactContextInBackground();
                     }
                 }
-            }
-        });
+            });
+        }
+        else if(remoteMessage.getData().get("roomName") != null) {
+            Intent launchIntent = new Intent("net.appworkshop.app.senses.call");
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            launchIntent.putExtra("callerName", remoteMessage.getData().get("callerName"));
+            launchIntent.putExtra("roomName", remoteMessage.getData().get("roomName"));
+            startActivity(launchIntent);
+        }
     }
 
     public void handleBadge(RemoteMessage remoteMessage) {
@@ -83,7 +95,11 @@ public class MessagingService extends FirebaseMessagingService {
             return;
         }
         Map<String, String> data = remoteMessage.getData();
+
         String customNotification = data.get("custom_notification");
+
+        System.out.println(customNotification);
+
         if(customNotification != null){
             try {
                 Bundle bundle = BundleJSONConverter.convertToBundle(new JSONObject(customNotification));
