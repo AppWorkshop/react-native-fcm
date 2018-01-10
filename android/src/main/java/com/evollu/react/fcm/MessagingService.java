@@ -25,8 +25,6 @@ public class MessagingService extends FirebaseMessagingService {
         Log.d(TAG, "Remote message received");
         System.out.println("remoteMessage.getData(): " +remoteMessage.getData());
 
-        //TODO: If normal notification, present banner. Else, call screen
-
         if(remoteMessage.getData().get("custom_notification") != null) {
             Intent i = new Intent("com.evollu.react.fcm.ReceiveNotification");
             i.putExtra("data", remoteMessage);
@@ -68,6 +66,10 @@ public class MessagingService extends FirebaseMessagingService {
             launchIntent.putExtra("callerName", remoteMessage.getData().get("callerName"));
             launchIntent.putExtra("roomName", remoteMessage.getData().get("roomName"));
             startActivity(launchIntent);
+        }
+        else if(remoteMessage.getData().get("cancelRinging") != null) {
+            Intent i = new Intent("net.appworkshop.cancelRinging");
+            sendBroadcast(i);
         }
     }
 
