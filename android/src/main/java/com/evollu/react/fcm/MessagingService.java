@@ -1,5 +1,6 @@
 package com.evollu.react.fcm;
 
+import java.util.Date;
 import java.util.Map;
 import android.content.Intent;
 import android.os.Bundle;
@@ -10,20 +11,20 @@ import android.util.Log;
 import com.facebook.react.ReactApplication;
 import com.facebook.react.ReactInstanceManager;
 import com.facebook.react.bridge.ReactContext;
+import com.facebook.react.modules.core.DeviceEventManagerModule;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
+
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
 public class MessagingService extends FirebaseMessagingService {
-
     private static final String TAG = "MessagingService";
 
     @Override
     public void onMessageReceived(RemoteMessage remoteMessage) {
         Log.d(TAG, "Remote message received");
-        System.out.println("remoteMessage.getData(): " +remoteMessage.getData());
 
         if(remoteMessage.getData().get("custom_notification") != null) {
             Intent i = new Intent("com.evollu.react.fcm.ReceiveNotification");
@@ -60,16 +61,43 @@ public class MessagingService extends FirebaseMessagingService {
                 }
             });
         }
-        else if(remoteMessage.getData().get("roomName") != null) {
-            Intent launchIntent = new Intent("net.appworkshop.app.senses.call");
-            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            launchIntent.putExtra("callerName", remoteMessage.getData().get("callerName"));
-            launchIntent.putExtra("roomName", remoteMessage.getData().get("roomName"));
-            startActivity(launchIntent);
-        }
         else if(remoteMessage.getData().get("cancelRinging") != null) {
+            // Send intent to inform CallActivity to cancel ringing
             Intent i = new Intent("net.appworkshop.cancelRinging");
+            i.putExtra("roomName", remoteMessage.getData().get("roomName"));
             sendBroadcast(i);
+        }
+        else if(remoteMessage.getData().get("roomName") != null) {
+            // We want to make sure we're not about to display a phone call from several
+            // hours ago due to device possibly being shut off
+
+            Long timeSent = Long.parseLong(remoteMessage.getData().get("timeSent"));
+            Long timeReceived = new Date().getTime();
+
+            Log.d(TAG, "Time difference in milliseconds: " +(timeReceived-timeSent));
+
+            // 1000 = 1second
+            // 10000 = 10seconds
+            // 100000 = 100seconds (1min 40seconds)
+
+            if(timeReceived-timeSent < 30000) { // Less than 30 seconds
+                try {
+                    ReactInstanceManager mReactInstanceManager = ((ReactApplication) getApplication()).getReactNativeHost().getReactInstanceManager();
+                    ReactContext context = mReactInstanceManager.getCurrentReactContext();
+                    context.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class).emit("checkForCall", null);
+                } catch(Exception e) {
+                    Log.e(TAG, "Exception doing emit: " +e);
+                }
+
+                Intent launchIntent = new Intent("net.appworkshop.app.senses.call");
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                launchIntent.putExtra("callerName", remoteMessage.getData().get("callerName"));
+                launchIntent.putExtra("roomName", remoteMessage.getData().get("roomName"));
+                startActivity(launchIntent);
+            }
+            else {
+                Log.d(TAG, "Call notification took too long to receive, will not bother");
+            }
         }
     }
 
@@ -99,8 +127,6 @@ public class MessagingService extends FirebaseMessagingService {
         Map<String, String> data = remoteMessage.getData();
 
         String customNotification = data.get("custom_notification");
-
-        System.out.println(customNotification);
 
         if(customNotification != null){
             try {
