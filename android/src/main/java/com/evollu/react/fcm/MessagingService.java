@@ -15,7 +15,6 @@ import com.facebook.react.modules.core.DeviceEventManagerModule;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
-
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -72,15 +71,17 @@ public class MessagingService extends FirebaseMessagingService {
             // hours ago due to device possibly being shut off
 
             Long timeSent = Long.parseLong(remoteMessage.getData().get("timeSent"));
+            Log.d(TAG, "timeSent: " +timeSent);
             Long timeReceived = new Date().getTime();
+            Log.d(TAG, "timeReceived: " +timeReceived);
 
-            Log.d(TAG, "Time difference in milliseconds: " +(timeReceived-timeSent));
+            Log.d(TAG, "Time difference in milliseconds: " +Math.abs(timeReceived-timeSent));
 
             // 1000 = 1second
             // 10000 = 10seconds
             // 100000 = 100seconds (1min 40seconds)
 
-            if(timeReceived-timeSent < 30000) { // Less than 30 seconds
+            if(Math.abs(timeReceived-timeSent) < 30000) { // Less than 30 seconds
                 try {
                     ReactInstanceManager mReactInstanceManager = ((ReactApplication) getApplication()).getReactNativeHost().getReactInstanceManager();
                     ReactContext context = mReactInstanceManager.getCurrentReactContext();
