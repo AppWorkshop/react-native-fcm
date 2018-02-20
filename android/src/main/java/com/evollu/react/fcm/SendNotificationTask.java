@@ -92,19 +92,19 @@ public class SendNotificationTask extends AsyncTask<Void, Void, Void> {
                 default:
                     notification.setPriority(NotificationCompat.PRIORITY_DEFAULT);
             }
-            
-            //icon
-            String smallIcon = bundle.getString("icon", "ic_launcher");
-            int smallIconResId = res.getIdentifier(smallIcon, "mipmap", packageName);
-            if(smallIconResId == 0){
-                smallIconResId = res.getIdentifier(smallIcon, "drawable", packageName);
-            }
-            if(smallIconResId != 0){
-                notification.setSmallIcon(smallIconResId);
+
+            //icon setup
+            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                int smallIcon = res.getIdentifier("icon_transparent", "mipmap", packageName);
+                notification.setSmallIcon(smallIcon);
+                notification.setColor(Color.BLACK);
+            } else {
+                int smallIcon = res.getIdentifier("icon", "mipmap", packageName);
+                notification.setSmallIcon(smallIcon);
             }
             
             //large icon
-            String largeIcon = bundle.getString("large_icon");
+            /*String largeIcon = bundle.getString("large_icon");
             if(largeIcon != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP){
                 if (largeIcon.startsWith("http://") || largeIcon.startsWith("https://")) {
                     Bitmap bitmap = getBitmapFromURL(largeIcon);
@@ -115,9 +115,10 @@ public class SendNotificationTask extends AsyncTask<Void, Void, Void> {
                     
                     if (largeIconResId != 0) {
                         notification.setLargeIcon(largeIconBitmap);
+                        notification.setColor(mContext.getResources().getColor(android.R.color.black));
                     }
                 }
-            }
+            }*/
             
             //big text
             String bigText = bundle.getString("big_text");
