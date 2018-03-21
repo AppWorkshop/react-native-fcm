@@ -1,7 +1,9 @@
 package com.evollu.react.fcm;
 
-import java.util.Date;
+import java.lang.reflect.Field;
 import java.util.Map;
+
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
@@ -11,15 +13,33 @@ import android.util.Log;
 import com.facebook.react.ReactApplication;
 import com.facebook.react.ReactInstanceManager;
 import com.facebook.react.bridge.ReactContext;
-import com.facebook.react.modules.core.DeviceEventManagerModule;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
-public class MessagingService extends FirebaseMessagingService {
+import im.delight.android.ddp.*;
+
+public class MessagingService extends FirebaseMessagingService implements MeteorCallback {
     private static final String TAG = "MessagingService";
+    private Meteor mMeteor;
+    private Map remoteMessageCallData;
+
+    public static Object getBuildConfigValue(Context context, String fieldName) {
+        try {
+            Class<?> clazz = Class.forName(context.getPackageName() + ".BuildConfig");
+            Field field = clazz.getField(fieldName);
+            return field.get(null);
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } catch (NoSuchFieldException e) {
+            e.printStackTrace();
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
 
     @Override
     public void onMessageReceived(RemoteMessage remoteMessage) {
@@ -67,38 +87,22 @@ public class MessagingService extends FirebaseMessagingService {
             sendBroadcast(i);
         }
         else if(remoteMessage.getData().get("roomName") != null) {
-            // We want to make sure we're not about to display a phone call from several
-            // hours ago due to device possibly being shut off
+            // It is entirely possible to receive a call notification when the device reboots
+            // several hours later. To prevent this issue, we make sure that the time difference from
+            // sent to received is less than 30 seconds.
 
-            Long timeSent = Long.parseLong(remoteMessage.getData().get("timeSent"));
-            Log.d(TAG, "timeSent: " +timeSent);
-            Long timeReceived = new Date().getTime();
-            Log.d(TAG, "timeReceived: " +timeReceived);
+            remoteMessageCallData = remoteMessage.getData();
 
-            Log.d(TAG, "Time difference in milliseconds: " +Math.abs(timeReceived-timeSent));
+            // Fetch meteor url
+            String meteorUrl = (String) getBuildConfigValue(getApplicationContext(), "METEOR_URL");
 
-            // 1000 = 1second
-            // 10000 = 10seconds
-            // 100000 = 100seconds (1min 40seconds)
-
-            if(Math.abs(timeReceived-timeSent) < 30000) { // Less than 30 seconds
-                try {
-                    ReactInstanceManager mReactInstanceManager = ((ReactApplication) getApplication()).getReactNativeHost().getReactInstanceManager();
-                    ReactContext context = mReactInstanceManager.getCurrentReactContext();
-                    context.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class).emit("checkForCall", null);
-                } catch(Exception e) {
-                    Log.e(TAG, "Exception doing emit: " +e);
-                }
-
-                Intent launchIntent = new Intent("net.appworkshop.app.senses.call");
-                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                launchIntent.putExtra("callerName", remoteMessage.getData().get("callerName"));
-                launchIntent.putExtra("roomName", remoteMessage.getData().get("roomName"));
-                startActivity(launchIntent);
-            }
-            else {
-                Log.d(TAG, "Call notification took too long to receive, will not bother");
-            }
+            // We can not do a time comparison on device because even when adjusted for timezones,
+            // the device could be several minutes out from the server. To fix this, we will
+            // need to verify the time difference on the server where the time is consistent.
+            // The call method to do this is located within the connect callback
+            mMeteor = new Meteor(this, meteorUrl);
+            mMeteor.addCallback(this);
+            mMeteor.connect();
         }
     }
 
@@ -129,7 +133,7 @@ public class MessagingService extends FirebaseMessagingService {
 
         String customNotification = data.get("custom_notification");
 
-        if(customNotification != null){
+        if(customNotification != null) {
             try {
                 Bundle bundle = BundleJSONConverter.convertToBundle(new JSONObject(customNotification));
                 FIRLocalMessagingHelper helper = new FIRLocalMessagingHelper(this.getApplication());
@@ -137,7 +141,55 @@ public class MessagingService extends FirebaseMessagingService {
             } catch (JSONException e) {
                 e.printStackTrace();
             }
-
         }
+    }
+
+    public void onConnect(boolean signedInAutomatically) {
+        Log.d(TAG, "onConnect");
+
+        mMeteor.call("verifyTimeOfNotification", new Object[]{remoteMessageCallData.get("timeSent")}, new ResultListener() {
+            @Override
+            public void onSuccess(String result) {
+                Log.d(TAG, "Result verifiying: " +result);
+
+                if(Boolean.valueOf(result)) {
+                    Log.d(TAG, "Call notification received in time");
+
+                    Intent launchIntent = new Intent("net.appworkshop.app.senses.call");
+                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    launchIntent.putExtra("callerName", remoteMessageCallData.get("callerName").toString());
+                    launchIntent.putExtra("roomName", remoteMessageCallData.get("roomName").toString());
+                    startActivity(launchIntent);
+                }
+                else {
+                    Log.d(TAG, "Call notification took too long to receive");
+                }
+
+                // No longer need to remain connected
+                mMeteor.disconnect();
+                mMeteor = null;
+            }
+
+            @Override
+            public void onError(String error, String reason, String details) {
+                Log.d(TAG, "Error verifying notification time: " +error);
+                // No longer need to remain connected
+                mMeteor.disconnect();
+                mMeteor = null;
+            }
+        });
+    }
+
+    // MARK: Required Meteor methods
+    public void onDataAdded(String collectionName, String documentID, String newValuesJson) { }
+
+    public void onDataChanged(String collectionName, String documentID, String updatedValuesJson, String removedValuesJson) { }
+
+    public void onDataRemoved(String collectionName, String documentID) { }
+
+    public void onDisconnect() { }
+
+    public void onException(Exception e) {
+        Log.d(TAG, "Meteor exception: " +e);
     }
 }

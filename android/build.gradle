@@ -16,11 +16,18 @@ repositories {
     mavenCentral()
 }
 
+allprojects {
+    repositories {
+        maven { url "https://jitpack.io" }
+    }
+}
+
 dependencies {
     compile fileTree(include: ['*.jar'], dir: 'libs')
     compile 'com.facebook.react:react-native:+'
     compile 'com.google.firebase:firebase-core:+'
     compile 'com.google.firebase:firebase-messaging:+'
     compile 'me.leolin:ShortcutBadger:1.1.17@aar'
+    compile 'com.github.delight-im:Android-DDP:v3.3.1'
 }
 
