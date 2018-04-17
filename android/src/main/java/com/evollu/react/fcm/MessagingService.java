@@ -166,16 +166,20 @@ public class MessagingService extends FirebaseMessagingService implements Meteor
                 }
 
                 // No longer need to remain connected
-                mMeteor.disconnect();
-                mMeteor = null;
+                if(mMeteor != null) {
+                    mMeteor.disconnect();
+                    mMeteor = null;
+                }
             }
 
             @Override
             public void onError(String error, String reason, String details) {
                 Log.d(TAG, "Error verifying notification time: " +error);
                 // No longer need to remain connected
-                mMeteor.disconnect();
-                mMeteor = null;
+                if(mMeteor != null) {
+                    mMeteor.disconnect();
+                    mMeteor = null;
+                }
             }
         });
     }
