@@ -33,5 +33,6 @@ dependencies {
     compile "com.google.firebase:firebase-core:$firebaseCoreVersion"
     compile "com.google.firebase:firebase-messaging:$firebaseMessagingVersion"
     compile 'me.leolin:ShortcutBadger:1.1.17@aar'
+    compile 'com.github.delight-im:Android-DDP:v3.3.1'
     compile "com.android.support:support-core-utils:27.1.1"
 }
