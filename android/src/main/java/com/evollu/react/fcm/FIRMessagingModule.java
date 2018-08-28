@@ -1,6 +1,8 @@
 package com.evollu.react.fcm;
 
 import android.app.Activity;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.BroadcastReceiver;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -23,6 +25,7 @@ import com.google.firebase.messaging.RemoteMessage;
 import com.google.firebase.messaging.RemoteMessage.Notification;
 
 import android.app.Application;
+import android.os.Build;
 import android.os.Bundle;
 import android.support.v4.app.NotificationManagerCompat;
 import android.util.Log;
@@ -33,6 +36,9 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import com.google.firebase.FirebaseApp;
+
+import static android.content.Context.NOTIFICATION_SERVICE;
 
 public class FIRMessagingModule extends ReactContextBaseJavaModule implements LifecycleEventListener, ActivityEventListener {
     private final static String TAG = FIRMessagingModule.class.getCanonicalName();
@@ -75,6 +81,57 @@ public class FIRMessagingModule extends ReactContextBaseJavaModule implements Li
     }
     
     @ReactMethod
+    public void createNotificationChannel(ReadableMap details, Promise promise){
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationManager mngr = (NotificationManager) getReactApplicationContext().getSystemService(NOTIFICATION_SERVICE);
+            String id = details.getString("id");
+            String name = details.getString("name");
+            String priority = details.getString("priority");
+            int importance;
+            switch(priority) {
+                case "min":
+                    importance = NotificationManager.IMPORTANCE_MIN;
+                    break;
+                case "low":
+                    importance = NotificationManager.IMPORTANCE_LOW;
+                    break;
+                case "high":
+                    importance = NotificationManager.IMPORTANCE_HIGH;
+                    break;
+                case "max":
+                    importance = NotificationManager.IMPORTANCE_MAX;
+                    break;
+                default:
+                    importance = NotificationManager.IMPORTANCE_DEFAULT;
+            }
+            if (mngr.getNotificationChannel(id) != null) {
+                promise.resolve(null);
+                return;
+            }
+            //
+            NotificationChannel channel = new NotificationChannel(
+                    id,
+                    name,
+                    importance);
+            // Configure the notification channel.
+            if(details.hasKey("description")){
+                channel.setDescription(details.getString("description"));
+            }
+            mngr.createNotificationChannel(channel);
+        }
+        promise.resolve(null);
+    }
+
+    @ReactMethod
+    public void deleteNotificationChannel(String id, Promise promise) {
+	    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+		    NotificationManager mngr = (NotificationManager) getReactApplicationContext().getSystemService(NOTIFICATION_SERVICE);
+		    mngr.deleteNotificationChannel(id);
+	    }
+	    promise.resolve(null);
+    }
+
+    @ReactMethod
     public void getFCMToken(Promise promise) {
         try {
             Log.d(TAG, "Firebase token: " + FirebaseInstanceId.getInstance().getToken());
@@ -85,6 +142,31 @@ public class FIRMessagingModule extends ReactContextBaseJavaModule implements Li
         }
     }
     
+    @ReactMethod
+    public void getEntityFCMToken(Promise promise) {
+        try {
+            String senderId = FirebaseApp.getInstance().getOptions().getGcmSenderId();
+            String token = FirebaseInstanceId.getInstance().getToken(senderId, "FCM");
+            Log.d(TAG, "Firebase token: " + token);
+            promise.resolve(token);
+        } catch (Throwable e) {
+            e.printStackTrace();
+            promise.reject(null,e.getMessage());
+        }
+    }
+
+    @ReactMethod
+    public void deleteEntityFCMToken(Promise promise) {
+        try {
+            String senderId = FirebaseApp.getInstance().getOptions().getGcmSenderId();
+            FirebaseInstanceId.getInstance().deleteToken(senderId, "FCM");
+            promise.resolve(null);
+        } catch (Throwable e) {
+            e.printStackTrace();
+            promise.reject(null,e.getMessage());
+        }
+    }
+
     @ReactMethod
     public void deleteInstanceId(Promise promise){
         try {
@@ -306,4 +388,3 @@ public class FIRMessagingModule extends ReactContextBaseJavaModule implements Li
         sendEvent("FCMNotificationReceived", parseIntent(intent));
     }
 }
-

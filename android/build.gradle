@@ -1,12 +1,19 @@
 apply plugin: 'com.android.library'
 
+def DEFAULT_COMPILE_SDK_VERSION             = 27
+def DEFAULT_BUILD_TOOLS_VERSION             = "27.0.3"
+def DEFAULT_TARGET_SDK_VERSION              = 27
+def DEFAULT_GOOGLE_PLAY_SERVICES_VERSION    = "+"
+def DEFAULT_FIREBASE_CORE_VERSION           = "+"
+def DEFAULT_FIREBASE_MESSAGING_VERSION      = "+"
+
 android {
-    compileSdkVersion 25
-    buildToolsVersion "25.0.2"
+    compileSdkVersion project.hasProperty('compileSdkVersion') ? project.compileSdkVersion : DEFAULT_COMPILE_SDK_VERSION
+    buildToolsVersion project.hasProperty('buildToolsVersion') ? project.buildToolsVersion : DEFAULT_BUILD_TOOLS_VERSION
 
     defaultConfig {
         minSdkVersion 16
-        targetSdkVersion 25
+        targetSdkVersion project.hasProperty('targetSdkVersion') ? project.targetSdkVersion : DEFAULT_TARGET_SDK_VERSION
         versionCode 1
         versionName "1.0"
     }
@@ -16,18 +23,15 @@ repositories {
     mavenCentral()
 }
 
-allprojects {
-    repositories {
-        maven { url "https://jitpack.io" }
-    }
-}
-
 dependencies {
+    def googlePlayServicesVersion = project.hasProperty('googlePlayServicesVersion') ? project.googlePlayServicesVersion : DEFAULT_GOOGLE_PLAY_SERVICES_VERSION
+    def firebaseCoreVersion = project.hasProperty('firebaseCoreVersion') ? project.firebaseCoreVersion : DEFAULT_FIREBASE_CORE_VERSION
+    def firebaseMessagingVersion = project.hasProperty('firebaseMessagingVersion') ? project.firebaseMessagingVersion : DEFAULT_FIREBASE_MESSAGING_VERSION
+
     compile fileTree(include: ['*.jar'], dir: 'libs')
     compile 'com.facebook.react:react-native:+'
-    compile 'com.google.firebase:firebase-core:+'
-    compile 'com.google.firebase:firebase-messaging:+'
+    compile "com.google.firebase:firebase-core:$firebaseCoreVersion"
+    compile "com.google.firebase:firebase-messaging:$firebaseMessagingVersion"
     compile 'me.leolin:ShortcutBadger:1.1.17@aar'
-    compile 'com.github.delight-im:Android-DDP:v3.3.1'
+    compile "com.android.support:support-core-utils:27.1.1"
 }
-
